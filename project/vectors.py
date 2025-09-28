@@ -1,3 +1,13 @@
+"""
+Module for vector operations
+covers the following operations:
+- length of first vector
+- length of second vector
+- length of resulting vector
+- scalar product
+- angle between vectors
+"""
+
 from typing import List, Union, Dict
 from math import acos, pi
 
@@ -24,8 +34,8 @@ __all__ = ["v1", "v2", "operations"]
 
 
 if __name__ == "__main__":
-    print(f" длина первого вектора: {operations['leght_first_vector'] }")
-    print(f" длина второго вектора: {operations['leght_second_vector'] }")
-    print(f" длина результирующего вектора: {operations['lenght_result_vector']}")
-    print(f" скалярное произведение: {operations['scalar_product']}")
-    print(f" угол между векторами: {operations['angle_between_vectors']}")
+    print(f" length of first vector: {operations['leght_first_vector'] }")
+    print(f" length of second vector: {operations['leght_second_vector'] }")
+    print(f" length of resulting vector: {operations['lenght_result_vector']}")
+    print(f" scalar product: {operations['scalar_product']}")
+    print(f" angle between vectors: {operations['angle_between_vectors']}")

@@ -1,10 +1,13 @@
+"""Tests for vectors.py module"""
+
+
 import pytest
 from project import vectors
 from math import acos, pi
 
 
 def test_lenght_first_vector() -> None:
-    """Проверка вычисления длины первого вектора"""
+    """Test calculation of first vector length"""
     vectors.v1 = [0, 5]
     vectors.operations["leght_first_vector"] = (
         sum(vd1**2 for vd1 in vectors.v1)
@@ -13,7 +16,7 @@ def test_lenght_first_vector() -> None:
 
 
 def test_lenght_second_vector() -> None:
-    """Проверка вычисления длины второго вектора"""
+    """Test calculation of second vector length"""
     vectors.v2[0] = 5
     vectors.operations["leght_second_vector"] = (
         sum(vd2**2 for vd2 in vectors.v2)
@@ -22,7 +25,7 @@ def test_lenght_second_vector() -> None:
 
 
 def test_lenght_result_vector() -> None:
-    """Проверка вычисления длины результирующего вектора"""
+    """Test calculation of resulting vector length"""
     vectors.v1 = [3, 4]
     vectors.v2 = [2, 8]
     vectors.operations["lenght_result_vector"] = (
@@ -35,7 +38,7 @@ def test_lenght_result_vector() -> None:
 
 
 def test_scalar_product() -> None:
-    """Проверка вычисления скалярного произведения"""
+    """Test calculation of scalar product"""
     vectors.v1 = [3, 4]
     vectors.v2 = [2, 8]
     vectors.operations["scalar_product"] = sum(
@@ -45,7 +48,7 @@ def test_scalar_product() -> None:
 
 
 def test_angle_between_vectors() -> None:
-    """Проверка вычисления угла между векторами"""
+    """Test calculation of angle between vectors"""
     vectors.v1 = [1, 1]
     vectors.v2 = [1, 0]
     vectors.operations["angle_between_vectors"] = (
