@@ -1,7 +1,7 @@
 """Tests for vectors.py module"""
 
 import pytest
-from project import vectors
+from project.task1 import vectors
 
 
 def test_lenght_first_vector() -> None:

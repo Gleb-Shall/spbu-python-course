@@ -1,7 +1,7 @@
 """Tests for matrices.py module"""
 
 import pytest
-from project import matrices
+from project.task1 import matrices
 
 
 def test_matrix_addition() -> None:
@@ -23,7 +23,7 @@ def test_matrix_multiplication() -> None:
 def test_matrix_transposition() -> None:
     """Test matrix transposition operation"""
     matrices.mas_matrices.append(
-        [[[1, 2, 3], [4, 5, 6]], []]
+        [[[1, 2, 3], [4, 5, 6]], [[0]]]
     )  # Transposition is performed for the first matrix in the list of two
     result = next(matrices.transposition)
     assert result == [[1, 4], [2, 5], [3, 6]]
