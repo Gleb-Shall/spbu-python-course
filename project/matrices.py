@@ -11,10 +11,6 @@ from typing import List, Union, Generator
 # Collection of matrix pairs for dynamic computation
 mas_matrices: List[List[List[List[Union[int, float]]]]] = []
 
-# Matrices for calculations
-m1: List[List[Union[int, float]]] = [[1, 2], [3, 4]]
-m2: List[List[Union[int, float]]] = [[5, 6], [7, 8]]
-
 # Create generators for each operation
 addition: Generator[List[List[Union[int, float]]], None, None] = (
     [[m1[i][j] + m2[i][j] for j in range(len(m1[0]))] for i in range(len(m1))]
