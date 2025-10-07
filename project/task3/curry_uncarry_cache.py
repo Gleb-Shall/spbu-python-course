@@ -4,11 +4,14 @@ curry_explicit, uncurry_explicit, cache_results
 Functions to curry, uncurry and cache functions
 """
 
-
 import functools
+from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, Union, overload
 
 
-def curry_explicit(function, arity):
+F = TypeVar("F", bound=Callable[..., Any])
+
+
+def curry_explicit(function: F, arity: int) -> Callable[..., Any]:
     """
     Convert a function to curry it.
 
@@ -24,7 +27,7 @@ def curry_explicit(function, arity):
         raise ValueError("Arity cannot be negative")
 
     @functools.wraps(function)
-    def curried(*args):
+    def curried(*args: Any) -> Any:
         """
         subfunction to convert a function to curry it.
 
@@ -48,7 +51,7 @@ def curry_explicit(function, arity):
     return curried
 
 
-def uncurry_explicit(function, arity):
+def uncurry_explicit(function: F, arity: int) -> Callable[..., Any]:
     """
     Convert a function to uncurry it.
 
@@ -63,7 +66,7 @@ def uncurry_explicit(function, arity):
     if arity < 0:
         raise ValueError("Arity cannot be negative")
 
-    def uncurried(*args):
+    def uncurried(*args: Any) -> Any:
         """
         subfunction to convert a function to uncurry it.
 
@@ -81,7 +84,19 @@ def uncurry_explicit(function, arity):
     return uncurried
 
 
-def cache_results(function=None, *, max_size=None):
+@overload
+def cache_results(function: F, *, max_size: Optional[int] = None) -> F:
+    ...
+
+
+@overload
+def cache_results(*, max_size: Optional[int] = None) -> Callable[[F], F]:
+    ...
+
+
+def cache_results(
+    function: Optional[F] = None, *, max_size: Optional[int] = None
+) -> Union[F, Callable[[F], F]]:
     """
     Decorator to cache the results of a function.
 
@@ -91,13 +106,13 @@ def cache_results(function=None, *, max_size=None):
     """
 
     if function is None:
-        return lambda function: cache_results(function, max_size=max_size)
+        return lambda f: cache_results(f, max_size=max_size)
 
-    cache = {}
-    cache_keys_old = []
+    cache: Dict[Tuple[Tuple[Any, ...], Tuple[Tuple[str, Any], ...]], Any] = {}
+    cache_keys_old: List[Tuple[Tuple[Any, ...], Tuple[Tuple[str, Any], ...]]] = []
 
     @functools.wraps(function)
-    def cached(*args, **kwargs):
+    def cached(*args: Any, **kwargs: Any) -> Any:
         """
         subfunction to cache the results of a function.
 
@@ -109,18 +124,23 @@ def cache_results(function=None, *, max_size=None):
             Result of the function
         """
 
-        key = (args, tuple(sorted(kwargs.items())))
+        key: Tuple[Tuple[Any, ...], Tuple[Tuple[str, Any], ...]] = (
+            args,
+            tuple(sorted(kwargs.items())),
+        )
 
         if key in cache:
             return cache[key]
         else:
-            result = function(*args, **kwargs)
+            result: Any = function(*args, **kwargs)
 
             if max_size is None:
                 return result
 
             if len(cache_keys_old) == max_size:
-                old_key = cache_keys_old.pop(0)
+                old_key: Tuple[
+                    Tuple[Any, ...], Tuple[Tuple[str, Any], ...]
+                ] = cache_keys_old.pop(0)
                 del cache[old_key]
 
             cache[key] = result
