@@ -11,6 +11,34 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, Union, o
 F = TypeVar("F", bound=Callable[..., Any])
 
 
+def _make_hashable(obj: Any) -> Any:
+    """
+    Convert unhashable objects to hashable tuples.
+
+    Args:
+        obj: Object to make hashable
+
+    Returns:
+        Hashable version of the object
+    """
+    if isinstance(obj, (list, tuple)):
+        return tuple(_make_hashable(item) for item in obj)
+    elif isinstance(obj, dict):
+        return tuple(sorted((k, _make_hashable(v)) for k, v in obj.items()))
+    elif isinstance(obj, set):
+        return tuple(sorted(_make_hashable(item) for item in obj))
+    elif isinstance(obj, (str, int, float, bool, type(None))):
+        return obj
+    else:
+        # For other types, try to convert to tuple if possible
+        try:
+            hash(obj)
+            return obj
+        except TypeError:
+            # If still unhashable, convert to string representation
+            return str(obj)
+
+
 def curry_explicit(function: F, arity: int) -> Callable[..., Any]:
     """
     Convert a function to curry it.
@@ -144,8 +172,8 @@ def cache_results(
         """
 
         key: Tuple[Tuple[Any, ...], Tuple[Tuple[str, Any], ...]] = (
-            args,
-            tuple(sorted(kwargs.items())),
+            tuple(_make_hashable(arg) for arg in args),
+            tuple(sorted((k, _make_hashable(v)) for k, v in kwargs.items())),
         )
 
         if key in cache:

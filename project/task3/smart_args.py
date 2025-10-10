@@ -88,7 +88,7 @@ def smart_args(
 
         # Essential validation: no nesting (for both modes)
         # Check for nesting: Isolated(Evaluated(...)) or Evaluated(Isolated(...))
-        def check_nesting(value):
+        def check_nesting(value: Any) -> bool:
             """Check if value contains nested Evaluated/Isolated"""
             if isinstance(value, Evaluated):
                 # Check if Evaluated contains Isolated
@@ -101,7 +101,7 @@ def smart_args(
             return False
 
         # Check all default values for nesting
-        all_defaults = []
+        all_defaults: List[Any] = []
         if argspec.defaults:
             all_defaults.extend(argspec.defaults)
         if argspec.kwonlydefaults:
@@ -252,51 +252,3 @@ def smart_args(
         return wrapper  # type: ignore[return-value]
 
     return decorator(func) if func else decorator
-
-
-def tests():
-    def test1():
-        call_count = 0
-
-        def create_value():
-            nonlocal call_count
-            call_count += 1
-            return f"evaluated_{call_count}"
-
-        @smart_args(support_positional=True)
-        def test_evaluated(value=Evaluated(create_value)):
-            return value
-
-        print(call_count)
-        result1 = test_evaluated()
-        print(call_count)
-        result2 = test_evaluated()
-        print(call_count)
-        result3 = test_evaluated()
-        print(call_count)
-
-    def test2():
-        call_count = 0
-
-        def create_value():
-            nonlocal call_count
-            call_count += 1
-            return f"evaluated_{call_count}"
-
-        @smart_args(support_positional=True)
-        def test_evaluated(value=Evaluated(create_value)):
-            return value
-
-        print(call_count)
-        result1 = test_evaluated()
-        print(call_count)
-        result2 = test_evaluated()
-        print(call_count)
-        result3 = test_evaluated()
-        print(call_count)
-
-    test1()
-    test2()
-
-
-tests()
