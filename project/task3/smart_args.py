@@ -7,12 +7,10 @@ from typing import (
     Dict,
     List,
     Set,
-    Tuple,
     TypeVar,
     Union,
     Optional,
     overload,
-    Sequence,
 )
 
 F = TypeVar("F", bound=Callable[..., Any])
@@ -88,11 +86,32 @@ def smart_args(
             elif isinstance(kwonly_default_value, Isolated):
                 isolated_params.add(param_name)
 
-        # Essential validation: no mixing (for both modes)
-        if evaluated_params and isolated_params:
-            raise AssertionError(
-                "Cannot mix Evaluated and Isolated in the same function"
-            )
+        # Essential validation: no nesting (for both modes)
+        # Check for nesting: Isolated(Evaluated(...)) or Evaluated(Isolated(...))
+        def check_nesting(value):
+            """Check if value contains nested Evaluated/Isolated"""
+            if isinstance(value, Evaluated):
+                # Check if Evaluated contains Isolated
+                if hasattr(value, "func") and isinstance(value.func(), Isolated):
+                    return True
+            elif isinstance(value, Isolated):
+                # Check if Isolated contains Evaluated (though this is unlikely)
+                # Isolated is just a marker, so this check is mainly for completeness
+                pass
+            return False
+
+        # Check all default values for nesting
+        all_defaults = []
+        if argspec.defaults:
+            all_defaults.extend(argspec.defaults)
+        if argspec.kwonlydefaults:
+            all_defaults.extend(argspec.kwonlydefaults.values())
+
+        for default_value in all_defaults:
+            if check_nesting(default_value):
+                raise AssertionError(
+                    "Cannot nest Evaluated and Isolated (e.g., Isolated(Evaluated(...)))"
+                )
 
         @wraps(f)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -233,3 +252,51 @@ def smart_args(
         return wrapper  # type: ignore[return-value]
 
     return decorator(func) if func else decorator
+
+
+def tests():
+    def test1():
+        call_count = 0
+
+        def create_value():
+            nonlocal call_count
+            call_count += 1
+            return f"evaluated_{call_count}"
+
+        @smart_args(support_positional=True)
+        def test_evaluated(value=Evaluated(create_value)):
+            return value
+
+        print(call_count)
+        result1 = test_evaluated()
+        print(call_count)
+        result2 = test_evaluated()
+        print(call_count)
+        result3 = test_evaluated()
+        print(call_count)
+
+    def test2():
+        call_count = 0
+
+        def create_value():
+            nonlocal call_count
+            call_count += 1
+            return f"evaluated_{call_count}"
+
+        @smart_args(support_positional=True)
+        def test_evaluated(value=Evaluated(create_value)):
+            return value
+
+        print(call_count)
+        result1 = test_evaluated()
+        print(call_count)
+        result2 = test_evaluated()
+        print(call_count)
+        result3 = test_evaluated()
+        print(call_count)
+
+    test1()
+    test2()
+
+
+tests()

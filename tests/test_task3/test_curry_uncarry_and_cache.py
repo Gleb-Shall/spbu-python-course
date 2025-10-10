@@ -23,7 +23,12 @@ class TestCurryExplicit:
         """Test with too many arguments"""
         curried = curry_explicit(lambda x, y: x + y, 2)
 
-        with pytest.raises(TypeError):
+        # Test that passing more than 1 argument to curried function raises ValueError
+        with pytest.raises(ValueError, match="Too many arguments for curried function"):
+            curried(1, 2)
+
+        # Test that passing more than arity arguments also raises ValueError (due to new constraint)
+        with pytest.raises(ValueError, match="Too many arguments for curried function"):
             curried(1, 2, 3)
 
     def test_zero_arity(self):
@@ -48,6 +53,48 @@ class TestCurryExplicit:
         """Test from assignment with string formatting"""
         f2 = curry_explicit((lambda x, y, z: f"<{x},{y},{z}>"), 3)
         assert f2(123)(456)(562) == "<123,456,562>"
+
+        # Test that passing multiple arguments raises ValueError
+        with pytest.raises(ValueError, match="Too many arguments for curried function"):
+            f2(123)(456, 562)
+
+        with pytest.raises(ValueError, match="Too many arguments for curried function"):
+            f2(123, 456)(562)
+
+    def test_max_function(self):
+        """Test with max function"""
+        f2 = curry_explicit(max, 3)
+        assert f2(123)(456)(562) == 562
+
+        g2 = uncurry_explicit(f2, 3)
+
+        # Test that passing multiple arguments to curried function raises ValueError
+        with pytest.raises(ValueError, match="Too many arguments for curried function"):
+            f2(123, 456)
+
+        # Test that uncurry_explicit expects exact number of arguments
+        with pytest.raises(TypeError, match="Expected 3 arguments, got 4"):
+            g2(123, 456, 562, 678)
+
+    def test_print_function(self):
+        """Test with print function"""
+        f2 = curry_explicit(print, 3)
+        assert f2(123)(56)(562) == None
+
+        g2 = uncurry_explicit(f2, 3)
+
+        # Test that passing multiple arguments to curried function raises ValueError
+        with pytest.raises(ValueError, match="Too many arguments for curried function"):
+            f2(123, 56)(562)
+
+        # Test that uncurry_explicit expects exact number of arguments
+        with pytest.raises(TypeError, match="Expected 3 arguments, got 4"):
+            g2(123, 56, 562, 678)
+
+    def test_map_function(self):
+        """Test with map function"""
+        f2 = curry_explicit(map, 2)
+        assert list(f2(lambda x: x * 2)([1, 2, 3])) == [2, 4, 6]
 
 
 class TestUncurryExplicit:
@@ -91,6 +138,28 @@ class TestUncurryExplicit:
         f2 = curry_explicit((lambda x, y, z: f"<{x},{y},{z}>"), 3)
         g2 = uncurry_explicit(f2, 3)
         assert g2(123, 456, 562) == "<123,456,562>"
+
+    def test_max_function(self):
+        """Test with max function"""
+
+        f2 = curry_explicit(max, 3)
+        g2 = uncurry_explicit(f2, 3)
+        assert g2(123, 456, 562) == 562
+
+    def test_print_function(self):
+        """Test with print function"""
+
+        f2 = curry_explicit(print, 3)
+        g2 = uncurry_explicit(f2, 3)
+        assert g2(123, 56, 562) == None
+
+    def test_map_function(self):
+        """Test with map function"""
+        f2 = curry_explicit(map, 2)
+        assert list(f2(lambda x: x * 2)([1, 2, 3])) == [2, 4, 6]
+
+        g2 = uncurry_explicit(f2, 2)
+        assert list(g2(lambda x: x * 2, [1, 2, 3])) == [2, 4, 6]
 
 
 class TestCacheResults:
@@ -214,6 +283,10 @@ class TestIntegration:
         result2 = curried(1)(2)(3)
         assert result2 == 6
         assert call_count == 1  # Did not increase
+
+        # Test that we can't pass multiple arguments at once
+        with pytest.raises(ValueError, match="Too many arguments for curried function"):
+            curried(1, 2)
 
         # Uncurry
         uncurried = uncurry_explicit(curried, 3)
