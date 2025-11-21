@@ -5,7 +5,6 @@ This module implements a system for lazy stream processing using Python generato
 It includes data generators, pipeline functions, and aggregators.
 """
 
-
 from typing import (
     Any,
     Callable,
@@ -21,7 +20,7 @@ from functools import reduce
 
 
 def data_generator(
-    data_source: Union[List[Any], Generator[Any, None, None], range, Iterable[Any]]
+    data_source: Union[List[Any], Generator[Any, None, None], range, Iterable[Any]],
 ) -> Generator[Any, None, None]:
     """
     Generator for input data generation.
