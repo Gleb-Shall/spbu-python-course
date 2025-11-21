@@ -1,4 +1,4 @@
-black
+black[jupyter]
 matplotlib
 mypy
 numpy
