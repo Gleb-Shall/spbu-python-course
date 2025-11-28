@@ -1,4 +1,10 @@
-black
+black[jupyter]
+matplotlib
 mypy
+numpy
+pandas
+plotly
 pre-commit
 pytest
+scikit-learn
+seaborn
