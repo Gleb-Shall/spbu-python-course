@@ -54,6 +54,9 @@ def curry_explicit(function: F, arity: int) -> Callable[..., Any]:
     if arity < 0:
         raise ValueError("Arity cannot be negative")
 
+    if arity == 0:
+        return function
+
     @functools.wraps(function)
     def curried(*args: Any) -> Any:
         """
@@ -67,19 +70,22 @@ def curry_explicit(function: F, arity: int) -> Callable[..., Any]:
             if arguments == arity returns a result of the function
         """
 
-        if len(args) > arity:
-            raise ValueError(f"Too many arguments for curried function")
-        elif len(args) == arity:
+        def next_curried(*new_args: Any) -> Any:
+            if len(new_args) <= 1:
+                return curried(*(args + new_args))
+            raise ValueError("Too many arguments for curried function")
+
+        if len(args) == arity:
             return function(*args)
         else:
-            get_new_arg = lambda *a: args + a
-            new_arg = get_new_arg()
-            if len(new_arg) <= 1:
-                return curried(*(args + new_arg))
-            else:
-                raise ValueError("Too many arguments for curried function")
+            return next_curried
 
-    return curried
+    def start_curried(*new_args: Any) -> Any:
+        if len(new_args) <= 1:
+            return curried(*new_args)
+        raise ValueError("Too many arguments for curried function")
+
+    return start_curried
 
 
 def uncurry_explicit(function: F, arity: int) -> Callable[..., Any]:
