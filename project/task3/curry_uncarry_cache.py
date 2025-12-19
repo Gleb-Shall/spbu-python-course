@@ -72,21 +72,14 @@ def curry_explicit(function: F, arity: int) -> Callable[..., Any]:
         elif len(args) == arity:
             return function(*args)
         else:
-            return (
-                lambda *a: curried(*(args + a))
-                if len(a) <= 1
-                else (_ for _ in ()).throw(
-                    ValueError("Too many arguments for curried function")
-                )
-            )
+            get_new_arg = lambda *a: args + a
+            new_arg = get_new_arg()
+            if len(new_arg) <= 1:
+                return curried(*(args + new_arg))
+            else:
+                raise ValueError("Too many arguments for curried function")
 
-    return (
-        lambda *a: curried(*a)
-        if len(a) <= 1
-        else (_ for _ in ()).throw(
-            ValueError("Too many arguments for curried function")
-        )
-    )
+    return curried
 
 
 def uncurry_explicit(function: F, arity: int) -> Callable[..., Any]:

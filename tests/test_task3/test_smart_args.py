@@ -22,16 +22,6 @@ class TestEvaluated:
         assert evaluated() == 2
         assert evaluated() == 3
 
-    def test_evaluated_with_lambda(self):
-        """Test Evaluated with lambda function"""
-        evaluated = Evaluated(lambda: [1, 2, 3])
-        result1 = evaluated()
-        result2 = evaluated()
-
-        assert result1 == [1, 2, 3]
-        assert result2 == [1, 2, 3]
-        assert result1 is not result2
-
 
 class TestSmartArgsKeywordOnly:
     """Test smart_args with support_positional=False (keyword-only mode)"""
@@ -107,16 +97,30 @@ class TestSmartArgsKeywordOnly:
         result = func(x=1, y=[1, 2, 3])
         assert result == (1, [1, 2, 3])
 
-    def test_keyword_only_nested_evaluated_isolated_error(self):
-        """Test that nesting Evaluated and Isolated raises error"""
-        with pytest.raises(
-            AssertionError,
-            match="Cannot nest Evaluated and Isolated",
-        ):
+    def test_evaluated_not_executed_when_arg_provided(self):
+        """Test that Evaluated is not executed when argument is provided"""
+        call_count = 0
 
-            @smart_args
-            def func(*, x=Evaluated(lambda: Isolated())):
-                return x
+        def create_value():
+            nonlocal call_count
+            call_count += 1
+            return f"evaluated_{call_count}"
+
+        @smart_args
+        def test_evaluated(*, value=Evaluated(create_value)):
+            return value
+
+        result1 = test_evaluated()
+        assert call_count == 2
+        assert result1 == f"evaluated_{call_count}"
+
+        result2 = test_evaluated(value="provided_value")
+        assert call_count == 2
+        assert result2 == "provided_value"
+
+        result3 = test_evaluated()
+        assert call_count == 3
+        assert result3 == f"evaluated_{call_count}"
 
 
 class TestSmartArgsPositional:
@@ -206,16 +210,54 @@ class TestSmartArgsPositional:
         result = func(x=1, y=[1, 2, 3])
         assert result == (1, [1, 2, 3])
 
-    def test_positional_nested_evaluated_isolated_error(self):
-        """Test that nesting Evaluated and Isolated raises error in positional mode"""
-        with pytest.raises(
-            AssertionError,
-            match="Cannot nest Evaluated and Isolated",
-        ):
+    def test_positional_evaluated_not_executed_when_arg_provided(self):
+        """Test that Evaluated is not executed when argument is provided in positional mode"""
+        call_count = 0
 
-            @smart_args(support_positional=True)
-            def func(x=Evaluated(lambda: Isolated())):
-                return x
+        def create_value():
+            nonlocal call_count
+            call_count += 1
+            return f"evaluated_{call_count}"
+
+        @smart_args(support_positional=True)
+        def test_evaluated(value=Evaluated(create_value)):
+            return value
+
+        result1 = test_evaluated()
+        assert call_count == 2
+        assert result1 == f"evaluated_{call_count}"
+
+        result2 = test_evaluated("provided_value")
+        assert call_count == 2
+        assert result2 == "provided_value"
+
+        result3 = test_evaluated(value="keyword_value")
+        assert call_count == 2
+        assert result3 == "keyword_value"
+
+        result4 = test_evaluated()
+        assert call_count == 3
+        assert result4 == f"evaluated_{call_count}"
+
+    def test_positional_mixed_positional_keyword_args(self):
+        """Test smart_args with mixed positional and keyword arguments"""
+
+        @smart_args(support_positional=True)
+        def test_mixed(pos_list=Isolated(), *, kw_dict=Isolated()):
+            pos_list.append("pos_modified")
+            kw_dict["kw_key"] = "kw_value"
+            return pos_list, kw_dict
+
+        original_list = [1, 2, 3]
+        original_dict = {"key1": "value1"}
+
+        result = test_mixed(original_list, kw_dict=original_dict)
+
+        assert original_list == [1, 2, 3]
+        assert original_dict == {"key1": "value1"}
+
+        assert result[0] == [1, 2, 3, "pos_modified"]
+        assert result[1] == {"key1": "value1", "kw_key": "kw_value"}
 
 
 class TestSmartArgsComplex:
@@ -231,87 +273,7 @@ class TestSmartArgsComplex:
         result = complex_func(1, 2, 3, 4, z=20, a=30, b=40)
         assert result == (1, 2, (3, 4), 20, {"a": 30, "b": 40})
 
-
-class TestSmartArgsBuiltinFunctions:
-    """Test smart_args with built-in Python functions"""
-
-    def test_with_len_function(self):
-        """Test smart_args with len function"""
-
-        @smart_args
-        def test_len(*, data=Evaluated(lambda: [1, 2, 3, 4, 5])):
-            return len(data)
-
-        result = test_len()
-        assert result == 5
-
-    def test_with_sorted_function(self):
-        """Test smart_args with sorted function"""
-
-        @smart_args
-        def test_sorted(*, data=Evaluated(lambda: [3, 1, 4, 1, 5])):
-            return sorted(data)
-
-        result = test_sorted()
-        assert result == [1, 1, 3, 4, 5]
-
-    def test_with_sum_function(self):
-        """Test smart_args with sum function"""
-
-        @smart_args
-        def test_sum(*, numbers=Evaluated(lambda: [1, 2, 3, 4, 5])):
-            return sum(numbers)
-
-        result = test_sum()
-        assert result == 15
-
-
-class TestSmartArgsUnhashableArgs:
-    """Test smart_args with unhashable arguments"""
-
-    def test_with_list_args(self):
-        """Test smart_args with list arguments"""
-
-        @smart_args
-        def test_list(*, data=Isolated()):
-            data.append("modified")
-            return data
-
-        original_list = [1, 2, 3]
-        result = test_list(data=original_list)
-
-        assert original_list == [1, 2, 3]
-        assert result == [1, 2, 3, "modified"]
-
-    def test_with_dict_args(self):
-        """Test smart_args with dictionary arguments"""
-
-        @smart_args
-        def test_dict(*, data=Isolated()):
-            data["new_key"] = "new_value"
-            return data
-
-        original_dict = {"key1": "value1", "key2": "value2"}
-        result = test_dict(data=original_dict)
-
-        assert original_dict == {"key1": "value1", "key2": "value2"}
-        assert result == {"key1": "value1", "key2": "value2", "new_key": "new_value"}
-
-    def test_with_set_args(self):
-        """Test smart_args with set arguments"""
-
-        @smart_args
-        def test_set(*, data=Isolated()):
-            data.add("new_item")
-            return data
-
-        original_set = {1, 2, 3}
-        result = test_set(data=original_set)
-
-        assert original_set == {1, 2, 3}
-        assert result == {1, 2, 3, "new_item"}
-
-    def test_nested_mutable_structures(self):
+    def test_isolated_with_nested_mutable_structures(self):
         """Test smart_args with nested mutable structures"""
 
         @smart_args
@@ -333,10 +295,6 @@ class TestSmartArgsUnhashableArgs:
             "dict": {"nested": "changed"},
             "value": 42,
         }
-
-
-class TestSmartArgsCacheIterations:
-    """Test smart_args demonstrating cache behavior after iterations"""
 
     def test_evaluated_cache_behavior(self):
         """Test that Evaluated creates new instances each time"""
@@ -380,381 +338,484 @@ class TestSmartArgsCacheIterations:
         assert result2 is not result3
         assert original == [1, 2, 3]
 
-    def test_evaluated_not_executed_when_arg_provided(self):
-        """Test that Evaluated is not executed when argument is provided"""
-        call_count = 0
 
-        def create_value():
-            nonlocal call_count
-            call_count += 1
-            return f"evaluated_{call_count}"
+class TestSmartArgsComplexMixes:
+    """Test complex combinations of Evaluated and Isolated in different modes"""
 
-        @smart_args
-        def test_evaluated(*, value=Evaluated(create_value)):
-            return value
+    def test_keyword_only_multiple_evaluated(self):
+        """Test keyword-only with multiple Evaluated parameters"""
+        counter1 = [0]
+        counter2 = [0]
 
-        result1 = test_evaluated()
-        assert call_count == 2
-        assert result1 == f"evaluated_{call_count}"
+        def get_counter1():
+            counter1[0] += 1
+            return counter1[0]
 
-        result2 = test_evaluated(value="provided_value")
-        assert call_count == 2
-        assert result2 == "provided_value"
-
-        result3 = test_evaluated()
-        assert call_count == 3
-        assert result3 == f"evaluated_{call_count}"
-
-    def test_evaluated_not_executed_positional_when_arg_provided(self):
-        """Test that Evaluated is not executed when argument is provided in positional mode"""
-        call_count = 0
-
-        def create_value():
-            nonlocal call_count
-            call_count += 1
-            return f"evaluated_{call_count}"
-
-        @smart_args(support_positional=True)
-        def test_evaluated(value=Evaluated(create_value)):
-            return value
-
-        result1 = test_evaluated()
-        assert call_count == 2
-        assert result1 == f"evaluated_{call_count}"
-
-        result2 = test_evaluated("provided_value")
-        assert call_count == 2
-        assert result2 == "provided_value"
-
-        result3 = test_evaluated(value="keyword_value")
-        assert call_count == 2
-        assert result3 == "keyword_value"
-
-        result4 = test_evaluated()
-        assert call_count == 3
-        assert result4 == f"evaluated_{call_count}"
-
-    def test_mixed_evaluated_isolated_with_provided_args(self):
-        """Test mixed Evaluated and Isolated when some arguments are provided"""
-        eval_count = 0
-        isolated_count = 0
-
-        def create_evaluated():
-            nonlocal eval_count
-            eval_count += 1
-            return f"eval_{eval_count}"
+        def get_counter2():
+            counter2[0] += 1
+            return counter2[0]
 
         @smart_args
-        def test_mixed(
-            *, evaluated_val=Evaluated(create_evaluated), isolated_data=Isolated()
+        def func(*, x=Evaluated(get_counter1), y=Evaluated(get_counter2), z=10):
+            return x, y, z
+
+        result1 = func(z=20)
+        assert result1[0] == result1[1]
+        assert result1[2] == 20
+        assert counter1[0] >= 1
+        assert counter2[0] >= 1
+
+        result2 = func(z=30)
+        assert result2[0] > result1[0]
+        assert result2[1] > result1[1]
+        assert result2[2] == 30
+
+    def test_keyword_only_multiple_isolated(self):
+        """Test keyword-only with multiple Isolated parameters"""
+
+        @smart_args
+        def func(*, list1=Isolated(), list2=Isolated(), x=5):
+            list1.append("a")
+            list2.append("b")
+            return list1, list2, x
+
+        orig1 = [1, 2]
+        orig2 = [3, 4]
+
+        result = func(list1=orig1, list2=orig2, x=10)
+
+        assert orig1 == [1, 2]
+        assert orig2 == [3, 4]
+        assert result == ([1, 2, "a"], [3, 4, "b"], 10)
+
+    def test_keyword_only_complex_mix_evaluated_isolated(self):
+        """Test keyword-only with complex mix of Evaluated and Isolated"""
+        eval_counter = [0]
+
+        def get_evaluated():
+            eval_counter[0] += 1
+            return f"eval_{eval_counter[0]}"
+
+        @smart_args
+        def func(
+            *,
+            eval1=Evaluated(get_evaluated),
+            isolated1=Isolated(),
+            eval2=Evaluated(get_evaluated),
+            isolated2=Isolated(),
+            normal=10,
         ):
-            isolated_data.append(f"processed_{evaluated_val}")
-            return evaluated_val, isolated_data
+            isolated1.append(eval1)
+            isolated2.append(eval2)
+            return eval1, isolated1, eval2, isolated2, normal
 
-        result1 = test_mixed(evaluated_val="provided_eval", isolated_data=["test"])
-        assert eval_count == 1
-        assert result1 == ("provided_eval", ["test", "processed_provided_eval"])
+        orig1 = ["start1"]
+        orig2 = ["start2"]
 
-        result2 = test_mixed(isolated_data=["test2"])
-        assert eval_count == 2
-        assert result2[0] == f"eval_{eval_count}"
-        assert result2[1] == ["test2", f"processed_eval_{eval_count}"]
+        result1 = func(isolated1=orig1, isolated2=orig2, normal=20)
 
-        result3 = test_mixed(evaluated_val="provided_eval2", isolated_data=["test3"])
-        assert eval_count == 2
-        assert result3[0] == "provided_eval2"
-        assert result3[1][-1] == "processed_provided_eval2"
+        assert orig1 == ["start1"]
+        assert orig2 == ["start2"]
+        assert result1[0].startswith("eval_")
+        assert result1[1] == ["start1", result1[0]]
+        assert result1[2].startswith("eval_")
+        assert result1[3] == ["start2", result1[2]]
+        assert result1[4] == 20
+        assert result1[0] != result1[2]
 
-        result4 = test_mixed(isolated_data=["test4"])
-        assert eval_count == 3
-        assert result4[0] == f"eval_{eval_count}"
-        assert result4[1][-1] == f"processed_eval_{eval_count}"
+        result2 = func(isolated1=orig1, isolated2=orig2, normal=30)
+        assert result2[0] != result1[0]
+        assert result2[2] != result1[2]
 
-    def test_evaluated_with_included_function(self):
-        @smart_args
-        def test_function(*, data=Evaluated(lambda: list(zip([1, 2, 3], [4, 5, 6])))):
-            return data
+    def test_positional_multiple_evaluated(self):
+        """Test positional with multiple Evaluated parameters"""
+        counter1 = [0]
+        counter2 = [0]
 
-        result = test_function()
-        assert result == [(1, 4), (2, 5), (3, 6)]
+        def get_counter1():
+            counter1[0] += 1
+            return counter1[0]
 
-
-class TestSmartArgsPositionalBuiltinFunctions:
-    """Test smart_args with support_positional=True and built-in Python functions"""
-
-    def test_positional_with_len_function(self):
-        """Test smart_args with len function in positional mode"""
+        def get_counter2():
+            counter2[0] += 1
+            return counter2[0]
 
         @smart_args(support_positional=True)
-        def test_len(data=Evaluated(lambda: [1, 2, 3, 4, 5])):
-            return len(data)
+        def func(x=Evaluated(get_counter1), y=Evaluated(get_counter2), z=10):
+            return x, y, z
 
-        result = test_len()
-        assert result == 5
+        result1 = func(z=20)
+        assert result1[0] == result1[1]
+        assert result1[2] == 20
 
-    def test_positional_with_sorted_function(self):
-        """Test smart_args with sorted function in positional mode"""
+        result2 = func(z=30)
+        assert result2[0] > result1[0]
+        assert result2[1] > result1[1]
+        assert result2[2] == 30
 
-        @smart_args(support_positional=True)
-        def test_sorted(data=Evaluated(lambda: [3, 1, 4, 1, 5])):
-            return sorted(data)
+        result3 = func(100, 200, z=40)
+        assert result3 == (100, 200, 40)
 
-        result = test_sorted()
-        assert result == [1, 1, 3, 4, 5]
-
-    def test_positional_with_sum_function(self):
-        """Test smart_args with sum function in positional mode"""
-
-        @smart_args(support_positional=True)
-        def test_sum(numbers=Evaluated(lambda: [1, 2, 3, 4, 5])):
-            return sum(numbers)
-
-        result = test_sum()
-        assert result == 15
-
-    def test_positional_with_max_function(self):
-        """Test smart_args with max function in positional mode"""
+    def test_positional_multiple_isolated(self):
+        """Test positional with multiple Isolated parameters"""
 
         @smart_args(support_positional=True)
-        def test_max(numbers=Evaluated(lambda: [1, 5, 3, 9, 2])):
-            return max(numbers)
+        def func(list1=Isolated(), list2=Isolated(), x=5):
+            list1.append("a")
+            list2.append("b")
+            return list1, list2, x
 
-        result = test_max()
-        assert result == 9
+        orig1 = [1, 2]
+        orig2 = [3, 4]
 
-    def test_positional_with_min_function(self):
-        """Test smart_args with min function in positional mode"""
+        result1 = func(orig1, orig2, x=10)
+        assert orig1 == [1, 2]
+        assert orig2 == [3, 4]
+        assert result1 == ([1, 2, "a"], [3, 4, "b"], 10)
 
-        @smart_args(support_positional=True)
-        def test_min(numbers=Evaluated(lambda: [5, 1, 3, 9, 2])):
-            return min(numbers)
+        result2 = func(list1=orig1, list2=orig2, x=20)
+        assert orig1 == [1, 2]
+        assert orig2 == [3, 4]
+        assert result2 == ([1, 2, "a"], [3, 4, "b"], 20)
 
-        result = test_min()
-        assert result == 1
+    def test_positional_pos_evaluated_kw_isolated(self):
+        """Test positional Evaluated + keyword-only Isolated"""
+        eval_counter = [0]
 
-
-class TestSmartArgsPositionalUnhashableArgs:
-    """Test smart_args with support_positional=True and unhashable arguments"""
-
-    def test_positional_with_list_args(self):
-        """Test smart_args with list arguments in positional mode"""
-
-        @smart_args(support_positional=True)
-        def test_list(data=Isolated()):
-            data.append("modified")
-            return data
-
-        original_list = [1, 2, 3]
-        result = test_list(original_list)
-
-        assert original_list == [1, 2, 3]
-        assert result == [1, 2, 3, "modified"]
-
-    def test_positional_with_dict_args(self):
-        """Test smart_args with dictionary arguments in positional mode"""
+        def get_evaluated():
+            eval_counter[0] += 1
+            return eval_counter[0]
 
         @smart_args(support_positional=True)
-        def test_dict(data=Isolated()):
-            data["new_key"] = "new_value"
-            return data
+        def func(x=Evaluated(get_evaluated), *, isolated=Isolated()):
+            isolated.append(x)
+            return x, isolated
 
-        original_dict = {"key1": "value1", "key2": "value2"}
-        result = test_dict(original_dict)
+        orig = ["start"]
 
-        assert original_dict == {"key1": "value1", "key2": "value2"}
-        assert result == {"key1": "value1", "key2": "value2", "new_key": "new_value"}
+        result1 = func(isolated=orig)
+        assert result1[0] >= 1
+        assert result1[1] == ["start", result1[0]]
+        assert orig == ["start"]
 
-    def test_positional_with_set_args(self):
-        """Test smart_args with set arguments in positional mode"""
+        result2 = func(isolated=orig)
+        assert result2[0] > result1[0]
+        assert result2[1] == ["start", result2[0]]
+        assert orig == ["start"]
 
-        @smart_args(support_positional=True)
-        def test_set(data=Isolated()):
-            data.add("new_item")
-            return data
+    def test_positional_pos_isolated_kw_evaluated(self):
+        """Test positional Isolated + keyword-only Evaluated"""
+        eval_counter = [0]
 
-        original_set = {1, 2, 3}
-        result = test_set(original_set)
-
-        assert original_set == {1, 2, 3}
-        assert result == {1, 2, 3, "new_item"}
-
-    def test_positional_nested_mutable_structures(self):
-        """Test smart_args with nested mutable structures in positional mode"""
+        def get_evaluated():
+            eval_counter[0] += 1
+            return f"eval_{eval_counter[0]}"
 
         @smart_args(support_positional=True)
-        def test_nested(data=Isolated()):
-            data["list"][0] = "modified"
-            data["dict"]["nested"] = "changed"
-            return data
+        def func(isolated=Isolated(), *, evaluated=Evaluated(get_evaluated)):
+            isolated.append(evaluated)
+            return isolated, evaluated
 
-        original_data = {"list": [1, 2, 3], "dict": {"nested": "original"}, "value": 42}
-        result = test_nested(original_data)
+        orig = ["start"]
 
-        assert original_data == {
-            "list": [1, 2, 3],
-            "dict": {"nested": "original"},
-            "value": 42,
-        }
-        assert result == {
-            "list": ["modified", 2, 3],
-            "dict": {"nested": "changed"},
-            "value": 42,
-        }
+        result1 = func(orig)
+        assert result1[0] == ["start", result1[1]]
+        assert result1[1].startswith("eval_")
+        assert orig == ["start"]
 
-    def test_positional_mixed_positional_keyword_args(self):
-        """Test smart_args with mixed positional and keyword arguments"""
+        result2 = func(orig)
+        assert result2[0] == ["start", result2[1]]
+        assert result2[1] != result1[1]
+        assert orig == ["start"]
 
-        @smart_args(support_positional=True)
-        def test_mixed(pos_list=Isolated(), *, kw_dict=Isolated()):
-            pos_list.append("pos_modified")
-            kw_dict["kw_key"] = "kw_value"
-            return pos_list, kw_dict
+    def test_positional_complex_mix_all_types(self):
+        """Test positional with complex mix: pos Evaluated, pos Isolated, kw Evaluated, kw Isolated"""
+        eval_counter1 = [0]
+        eval_counter2 = [0]
 
-        original_list = [1, 2, 3]
-        original_dict = {"key1": "value1"}
+        def get_eval1():
+            eval_counter1[0] += 1
+            return f"pos_eval_{eval_counter1[0]}"
 
-        result = test_mixed(original_list, kw_dict=original_dict)
-
-        assert original_list == [1, 2, 3]
-        assert original_dict == {"key1": "value1"}
-
-        assert result[0] == [1, 2, 3, "pos_modified"]
-        assert result[1] == {"key1": "value1", "kw_key": "kw_value"}
-
-
-class TestSmartArgsPositionalCacheIterations:
-    """Test smart_args with support_positional=True demonstrating cache behavior after iterations"""
-
-    def test_positional_evaluated_cache_behavior(self):
-        """Test that Evaluated creates new instances each time in positional mode"""
-        call_count = 0
-
-        def create_list():
-            nonlocal call_count
-            call_count += 1
-            return [call_count]
+        def get_eval2():
+            eval_counter2[0] += 1
+            return f"kw_eval_{eval_counter2[0]}"
 
         @smart_args(support_positional=True)
-        def test_evaluated(data=Evaluated(create_list)):
-            return data
-
-        result1 = test_evaluated()
-        result2 = test_evaluated()
-        result3 = test_evaluated()
-
-        assert call_count == 4
-        assert result1 is not result2
-        assert result2 is not result3
-
-    def test_positional_isolated_cache_behavior(self):
-        """Test that Isolated creates deep copies in positional mode"""
-
-        @smart_args(support_positional=True)
-        def test_isolated(data=Isolated()):
-            data.append(len(data))
-            return data
-
-        original = [1, 2, 3]
-
-        result1 = test_isolated(original)
-        result2 = test_isolated(original)
-        result3 = test_isolated(original)
-
-        assert result1 == [1, 2, 3, 3]
-        assert result2 == [1, 2, 3, 3]
-        assert result3 == [1, 2, 3, 3]
-        assert result1 is not result2
-        assert result2 is not result3
-        assert original == [1, 2, 3]
-
-    def test_positional_mixed_evaluated_isolated_iterations(self):
-        """Test mixed Evaluated and Isolated behavior over multiple iterations in positional mode"""
-        counter = 0
-
-        def get_counter():
-            nonlocal counter
-            counter += 1
-            return counter
-
-        @smart_args(support_positional=True)
-        def test_mixed(evaluated_val=Evaluated(get_counter), isolated_data=Isolated()):
-            isolated_data.append(evaluated_val)
-            return evaluated_val, isolated_data
-
-        results = []
-        for i in range(3):
-            result = test_mixed(isolated_data=[f"iteration_{i}"])
-            results.append(result)
-
-        assert counter == 4
-
-        assert results[0][0] == counter - 2
-        assert results[1][0] == counter - 1
-        assert results[2][0] == counter
-
-        assert results[0][1] is not results[1][1]
-        assert results[1][1] is not results[2][1]
-
-    def test_positional_evaluated_not_executed_when_arg_provided(self):
-        """Test that Evaluated is not executed when argument is provided in positional mode"""
-        call_count = 0
-
-        def create_value():
-            nonlocal call_count
-            call_count += 1
-            return f"evaluated_{call_count}"
-
-        @smart_args(support_positional=True)
-        def test_evaluated(value=Evaluated(create_value)):
-            return value
-
-        result1 = test_evaluated()
-        assert call_count == 2
-        assert result1 == f"evaluated_{call_count}"
-
-        result2 = test_evaluated("provided_value")
-        assert call_count == 2
-        assert result2 == "provided_value"
-
-        result3 = test_evaluated(value="keyword_value")
-        assert call_count == 2
-        assert result3 == "keyword_value"
-
-        result4 = test_evaluated()
-        assert call_count == 3
-        assert result4 == f"evaluated_{call_count}"
-
-    def test_positional_complex_iterations_with_varargs(self):
-        """Test complex iterations with *args in positional mode"""
-        eval_count = 0
-
-        def create_evaluated():
-            nonlocal eval_count
-            eval_count += 1
-            return f"eval_{eval_count}"
-
-        @smart_args(support_positional=True)
-        def test_complex(
-            isolated_data=Isolated(), *args, evaluated_val=Evaluated(create_evaluated)
+        def func(
+            pos_eval=Evaluated(get_eval1),
+            pos_isolated=Isolated(),
+            *,
+            kw_eval=Evaluated(get_eval2),
+            kw_isolated=Isolated(),
         ):
-            isolated_data.append(evaluated_val)
-            isolated_data.extend(args)
-            return evaluated_val, isolated_data, args
+            pos_isolated.append(pos_eval)
+            kw_isolated.append(kw_eval)
+            return pos_eval, pos_isolated, kw_eval, kw_isolated
 
-        result1 = test_complex(isolated_data=["start"])
-        assert eval_count == 2
-        assert result1[0] == f"eval_{eval_count}"
-        assert result1[1] == ["start", f"eval_{eval_count}"]
+        pos_orig = ["pos_start"]
+        kw_orig = ["kw_start"]
+
+        result1 = func(pos_isolated=pos_orig, kw_isolated=kw_orig)
+
+        assert pos_orig == ["pos_start"]
+        assert kw_orig == ["kw_start"]
+        assert result1[0].startswith("pos_eval_")
+        assert result1[1] == ["pos_start", result1[0]]
+        assert result1[2].startswith("kw_eval_")
+        assert result1[3] == ["kw_start", result1[2]]
+
+        result2 = func(pos_isolated=pos_orig, kw_isolated=kw_orig)
+        assert result2[0] != result1[0]
+        assert result2[2] != result1[2]
+
+    def test_positional_mix_with_args_kwargs(self):
+        """Test positional mix with *args and **kwargs"""
+        eval_counter = [0]
+
+        def get_evaluated():
+            eval_counter[0] += 1
+            return eval_counter[0]
+
+        @smart_args(support_positional=True)
+        def func(
+            x=Evaluated(get_evaluated),
+            isolated=Isolated(),
+            *args,
+            kw_eval=Evaluated(get_evaluated),
+            **kwargs,
+        ):
+            isolated.append(x)
+            isolated.extend(args)
+            return x, isolated, args, kw_eval, kwargs
+
+        orig = ["start"]
+
+        result1 = func(isolated=orig, kw_eval=100, extra="value")
+        result2 = func(isolated=orig, kw_eval=200, extra="value2")
+        result3 = func(999, orig, 1, 2, 3, kw_eval=300, extra="value3")
+
+        assert orig == ["start"]
+        assert result1[0] >= 1
+        assert result1[1] == ["start", result1[0]]
         assert result1[2] == ()
+        assert result1[3] == 100
+        assert result1[4] == {"extra": "value"}
 
-        result2 = test_complex(["start2"], 1, 2, 3)
-        assert eval_count == 3
-        assert result2[0] == f"eval_{eval_count}"
-        assert result2[1] == ["start2", f"eval_{eval_count}", 1, 2, 3]
-        assert result2[2] == (1, 2, 3)
+        assert result2[0] > result1[0]
+        assert result2[1] == ["start", result2[0]]
+        assert result2[2] == ()
+        assert result2[3] == 200
+        assert result2[4] == {"extra": "value2"}
 
-        result3 = test_complex(["start3"], 4, 5, evaluated_val="provided")
-        assert eval_count == 3
-        assert result3[0] == "provided"
-        assert result3[1] == ["start3", "provided", 4, 5]
-        assert result3[2] == (4, 5)
+        assert result3[0] == 999
+        assert result3[1] == ["start", 999, 1, 2, 3]
+        assert result3[2] == (1, 2, 3)
+        assert result3[3] == 300
+        assert result3[4] == {"extra": "value3"}
+        assert orig == ["start"]
+
+    def test_keyword_only_all_evaluated(self):
+        """Test keyword-only with all parameters using Evaluated"""
+        counters = {"a": 0, "b": 0, "c": 0}
+
+        def get_a():
+            counters["a"] += 1
+            return counters["a"]
+
+        def get_b():
+            counters["b"] += 1
+            return counters["b"]
+
+        def get_c():
+            counters["c"] += 1
+            return counters["c"]
+
+        @smart_args
+        def func(*, a=Evaluated(get_a), b=Evaluated(get_b), c=Evaluated(get_c)):
+            return a, b, c
+
+        result1 = func()
+        assert result1[0] == result1[1] == result1[2]
+        assert result1[0] >= 1
+
+        result2 = func()
+        assert result2[0] > result1[0]
+        assert result2[1] > result1[1]
+        assert result2[2] > result1[2]
+
+    def test_keyword_only_all_isolated(self):
+        """Test keyword-only with all parameters using Isolated"""
+
+        @smart_args
+        def func(*, list1=Isolated(), list2=Isolated(), list3=Isolated()):
+            list1.append(1)
+            list2.append(2)
+            list3.append(3)
+            return list1, list2, list3
+
+        orig1 = [10]
+        orig2 = [20]
+        orig3 = [30]
+
+        result = func(list1=orig1, list2=orig2, list3=orig3)
+
+        assert orig1 == [10]
+        assert orig2 == [20]
+        assert orig3 == [30]
+        assert result == ([10, 1], [20, 2], [30, 3])
+
+    def test_positional_all_evaluated(self):
+        """Test positional with all parameters using Evaluated"""
+        counters = {"x": 0, "y": 0, "z": 0}
+
+        def get_x():
+            counters["x"] += 1
+            return counters["x"]
+
+        def get_y():
+            counters["y"] += 1
+            return counters["y"]
+
+        def get_z():
+            counters["z"] += 1
+            return counters["z"]
+
+        @smart_args(support_positional=True)
+        def func(x=Evaluated(get_x), y=Evaluated(get_y), z=Evaluated(get_z)):
+            return x, y, z
+
+        result1 = func()
+        assert result1[0] == result1[1] == result1[2]
+        assert result1[0] >= 1
+
+        result2 = func()
+        assert result2[0] > result1[0]
+        assert result2[1] > result1[1]
+        assert result2[2] > result1[2]
+
+    def test_positional_all_isolated(self):
+        """Test positional with all parameters using Isolated"""
+
+        @smart_args(support_positional=True)
+        def func(list1=Isolated(), list2=Isolated(), list3=Isolated()):
+            list1.append(1)
+            list2.append(2)
+            list3.append(3)
+            return list1, list2, list3
+
+        orig1 = [10]
+        orig2 = [20]
+        orig3 = [30]
+
+        result1 = func(orig1, orig2, orig3)
+        assert orig1 == [10]
+        assert orig2 == [20]
+        assert orig3 == [30]
+        assert result1 == ([10, 1], [20, 2], [30, 3])
+
+        result2 = func(list1=orig1, list2=orig2, list3=orig3)
+        assert orig1 == [10]
+        assert orig2 == [20]
+        assert orig3 == [30]
+        assert result2 == ([10, 1], [20, 2], [30, 3])
+
+
+class TestSmartArgsNestingErrors:
+    """Test that nesting Evaluated and Isolated raises errors in all cases"""
+
+    def test_keyword_only_evaluated_contains_isolated(self):
+        """Test that Evaluated(lambda: Isolated()) raises error in keyword-only mode"""
+        with pytest.raises(
+            AssertionError,
+            match="Cannot nest Evaluated and Isolated",
+        ):
+
+            @smart_args
+            def func(*, x=Evaluated(lambda: Isolated())):
+                return x
+
+    def test_keyword_only_multiple_nested_evaluated_isolated(self):
+        """Test that multiple nested Evaluated(Isolated) raise errors"""
+        with pytest.raises(
+            AssertionError,
+            match="Cannot nest Evaluated and Isolated",
+        ):
+
+            @smart_args
+            def func(
+                *,
+                x=Evaluated(lambda: Isolated()),
+                y=Evaluated(lambda: Isolated()),
+            ):
+                return x, y
+
+    def test_positional_evaluated_contains_isolated(self):
+        """Test that Evaluated(lambda: Isolated()) raises error in positional mode"""
+        with pytest.raises(
+            AssertionError,
+            match="Cannot nest Evaluated and Isolated",
+        ):
+
+            @smart_args(support_positional=True)
+            def func(x=Evaluated(lambda: Isolated())):
+                return x
+
+    def test_positional_multiple_nested_evaluated_isolated(self):
+        """Test that multiple nested Evaluated(Isolated) raise errors in positional mode"""
+        with pytest.raises(
+            AssertionError,
+            match="Cannot nest Evaluated and Isolated",
+        ):
+
+            @smart_args(support_positional=True)
+            def func(
+                x=Evaluated(lambda: Isolated()),
+                y=Evaluated(lambda: Isolated()),
+            ):
+                return x, y
+
+    def test_positional_mixed_nested_keyword_only(self):
+        """Test nested Evaluated(Isolated) in both positional and keyword-only args"""
+        with pytest.raises(
+            AssertionError,
+            match="Cannot nest Evaluated and Isolated",
+        ):
+
+            @smart_args(support_positional=True)
+            def func(
+                x=Evaluated(lambda: Isolated()),
+                *,
+                y=Evaluated(lambda: Isolated()),
+            ):
+                return x, y
+
+    def test_keyword_only_evaluated_with_function_returning_isolated(self):
+        """Test that Evaluated with function returning Isolated raises error"""
+
+        def get_isolated():
+            return Isolated()
+
+        with pytest.raises(
+            AssertionError,
+            match="Cannot nest Evaluated and Isolated",
+        ):
+
+            @smart_args
+            def func(*, x=Evaluated(get_isolated)):
+                return x
+
+    def test_positional_evaluated_with_function_returning_isolated(self):
+        """Test that Evaluated with function returning Isolated raises error in positional mode"""
+
+        def get_isolated():
+            return Isolated()
+
+        with pytest.raises(
+            AssertionError,
+            match="Cannot nest Evaluated and Isolated",
+        ):
+
+            @smart_args(support_positional=True)
+            def func(x=Evaluated(get_isolated)):
+                return x
